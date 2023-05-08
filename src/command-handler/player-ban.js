@@ -14,7 +14,6 @@ module.exports = {
   async execute(interaction) {
     try {
       await interaction.deferReply({ ephemeral: false });
-
       const roleName = 'Obelisk Permission';
       const guild = interaction.guild;
 
