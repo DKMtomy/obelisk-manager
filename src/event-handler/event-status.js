@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { db } = require('../script');
+const { db } = require('../src/script');
 const axios = require('axios');
 
 module.exports = {
@@ -15,6 +15,7 @@ module.exports = {
         try {
           const managementStatusMessage = document._fieldsProto['Server Status'].mapValue.fields.managementStatusMessage.stringValue;
           const managementStatus = document._fieldsProto['Server Status'].mapValue.fields.managementStatus.stringValue;
+          const autoMaintenance = document._fieldsProto['Server Status']?.mapValue?.fields?.autoMaintenance?.booleanValue;
           const token = document._fieldsProto.token.stringValue;
 
           let output = '';
@@ -74,27 +75,52 @@ module.exports = {
           const row = new ActionRowBuilder()
             .addComponents(
               new ButtonBuilder()
-                .setCustomId('restart-cluster')
-                .setLabel('Restart Cluster')
+                .setCustomId('auto-maintenance')
+                .setLabel('Auto Maintenance')
                 .setStyle(ButtonStyle.Success),
 
               new ButtonBuilder()
-                .setCustomId('stop-cluster')
-                .setLabel('Stop Cluster')
+                .setCustomId('cluster-action')
+                .setLabel('Cluster Action')
                 .setStyle(ButtonStyle.Secondary),
             );
 
-          let embed = new EmbedBuilder()
+          serviceMaintenance = async () => {
+            serviceInformation.forEach(async obj => {
+              const url = `https://api.nitrado.net/services/${obj.id}/gameservers`;
+              const response = await axios.get(url, { headers: { 'Authorization': token } });
+              const currentStatus = response.data.data.gameserver.status;
+
+              if ((response.data.data.gameserver.game === 'arkxb' || response.data.data.gameserver.game === 'arkps' || response.data.data.gameserver.game === 'arkse' || response.data.data.gameserver.game === 'arkswitch') && currentStatus === 'stopped') {
+                const url = `https://api.nitrado.net/services/${obj.id}/gameservers/restart`;
+                const response = await axios.post(url, { message: 'Obelisk Automated Restart' }, { headers: { 'Authorization': token } });
+                console.log(response.data.message);
+
+                const embed = new EmbedBuilder()
+                  .setColor('#2ecc71')
+                  .setTitle('`Obelisk Management`')
+                  .setFooter({ text: `Tip: Contact support if there are issues.\nOptional: Auto Server Maintenance.` })
+                  .setDescription(`**Automatic Server Maintenance**\nCrashed server, brought back online.\nServer Identifiaction #: \`${obj.id}\`\n<t:${unixTime}:f>`)
+
+                await channel.send({ embeds: [embed] })
+              }
+            });
+          };
+
+          autoMaintenance ? serviceMaintenance() : null;
+
+          const embed = new EmbedBuilder()
             .setColor('#2ecc71')
             .setTitle('`Obelisk Management`')
-            .setFooter({ text: `Tip: Contact support if there are issues.\nServer cap of 20 servers, for status display.` })
-            .setDescription(`${output} **Global Player Count:**\n \`🌐\` \`(${currentPlayers}/${maximumPlayers})\`\n\n<t:${unixTime}:R>\n**[Partnership & Affiliation](https://billing.sparkedhost.com/aff.php?aff=1925)**\nWe host our service at Sparked-Host.\nGreat uptime and amazing cloud hosting!`)
-            .setImage('https://i.imgur.com/AkhEz26.png');
+            .setFooter({ text: `Server cap of 20 servers, for status display.\nTip: Contact support if there are issues.` })
+            .setDescription(`${output} **Global Player Count:**\n \`🌐\` \`(${currentPlayers}/${maximumPlayers})\`\n\n<t:${unixTime}:R>\n**[Partnership & Affiliation](https://pebblehost.com/)**\nWe host our service at Pebble-Host.\nGreat uptime and amazing cloud hosting!\n\n**Automatic Maintenance**\n${autoMaintenance ? `Set as: \`'True'\` auto restarts enabled.\nDowned servers will be pushed online.` : `Set as: \`'False'\` auto restarts disabled.\nDowned servers will not be pushed online.`}`)
+            .setImage('https://i.imgur.com/y3UWJCV.png')
 
           await message.edit({ embeds: [embed], components: [row] });
           console.log('Status Refreshed');
 
         } catch (error) {
+          console.log(error);
           continue;
         }
       }
