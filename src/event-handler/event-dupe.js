@@ -1,19 +1,18 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { db } = require('../script');
 const axios = require('axios');
+const { db } = require('../script');
 
 module.exports = {
   name: Events.ClientReady,
   once: true,
-  execute(client) {
-    async function loop() {
+  async execute(client) {
+    const loop = async () => {
       const collectionReference = db.collection('discord-data');
       const snapshot = await collectionReference.get();
 
       for (const document of snapshot.docs) {
-        const dupeProtection = document._fieldsProto['Server Protections']?.mapValue?.fields?.dupeProtection?.stringValue;
-        const token = document._fieldsProto.token.stringValue;
-
+        const { dupeProtection, token } = document.get(['Server Protections', 'token']);
+        
         try {
           let total = 0;
           let current = 0;
@@ -38,7 +37,6 @@ module.exports = {
 
               onlinePlayers.push(...onlinePlayersServer);
               serverIdentification.push(server.id);
-
             } catch (error) {
               console.error(error);
             }
@@ -61,7 +59,7 @@ module.exports = {
             const promises = playersOnMultipleServers.map(async player => {
               console.log(`ID: ${player.id}, Name: ${player.name}`);
 
-              const playerServers = serverIdentification.map(async server => {
+              await Promise.all(serverIdentification.map(async server => {
                 const url = `https://api.nitrado.net/services/${server}/gameservers/games/players`;
                 const response = await axios.get(url, { headers: { 'Authorization': token } });
                 const currentPlayers = response.data.data.players;
@@ -71,12 +69,9 @@ module.exports = {
                     console.log(obj);
 
                     playerInformation += `\n\`🟢\` \`Player Online\`\n\`🔗\` ${player.name}\n\`🔗\` ${player.id}\n`;
-
                   }
                 });
-              });
-
-              await Promise.all(playerServers);
+              }));
             });
 
             await Promise.all(promises);
@@ -85,19 +80,19 @@ module.exports = {
               .setColor('#2ecc71')
               .setTitle('`Obelisk Management`')
               .setFooter({ text: 'Tip: Contact support if there are issues.' })
-              .setDescription(`Player located on servers at once.\nPossible duping in progress...\n${playerInformation}\nThe search event was successful.\nScanned \`${current}\` of \`${total}\` servers.\nLimited \`2\` objects.`);
+              .setDescription(`Player located on multiple servers at once.\nPossible duping in progress...\n${playerInformation}\nThe search event was successful.\nScanned \`${current}\` of \`${total}\` servers.\nLimited to \`2\` objects.`);
 
             const channel = await client.channels.fetch(dupeProtection);
             await channel.send({ embeds: [embed] });
           }
-
         } catch (error) {
           console.log(error);
           continue;
         }
       }
       setTimeout(loop, 7500);
-    }
-    // loop();
+    };
+
+    loop();
   },
 };

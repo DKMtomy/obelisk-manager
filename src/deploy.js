@@ -1,6 +1,6 @@
 const { REST, Routes } = require('discord.js');
 const { clientIdentifier, token } = require('./config.json');
-const fs = require('node:fs');
+const fs = require('fs');
 
 const commands = [];
 const commandFiles = fs.readdirSync('src/command-handler').filter(file => file.endsWith('.js'));
